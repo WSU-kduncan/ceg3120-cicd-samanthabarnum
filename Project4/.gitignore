@@ -1,0 +1,25 @@
+# windows-generated files
+.DS_Store
+Thumbs.db
+
+# logs and temp files
+*.log
+*.tmp
+*.bak
+*.swp
+
+# VS code settings
+.vscode/
+
+# misc files
+*.zip
+*.rar
+*.7z
+*.mp4
+*.jpeg
+*.gif
+*.psd
+*.exe
+
+# ignore empty folders
+*/.keep
