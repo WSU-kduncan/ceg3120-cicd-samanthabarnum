@@ -25,4 +25,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: barnum9/barnum-CEG3120:latest
+          tags: barnum9/barnum-ceg3120:latest
