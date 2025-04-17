@@ -105,25 +105,34 @@ jobs:
 
 ### Testing and Validating
 
-To test that the workflow works as expected:
-1. Make sure your Dockerfile is working and builds locally
-2. Create a semantic version tag:
+To test that the workflow works as expected, I:
+
+1. Made sure my Dockerfile is working and builds locally
+
+2. Created a version tag:
+
 ```
 git tag -a v1.0.1 -m "next patch"
 git push origin v1.0.1
 ```
-3. Go to the actions tab on GH and watch the workflow run
-4. After it completes, check DH to confirm that 4 tags were pushed:
+
+3. Went to the actions tab on GH and watched the workflow run
+
+4. After it completed, I checked DH to confirm that 4 tags were pushed:
+
 - `latest`
 - `1`
 - `1.0`
 - `1.0.1`
-5. Optionally run:
+
+To confirm that everything worked correctly, I ran the following commands to pull the versioned image from DockerHub and run it locally (once Docker Desktop was actually running, I was too gung ho):
+
 ```
 docker pull barnum9/barnum-ceg3120:1.0.1
 docker run -p 4200:4200 barnum9/barnum-ceg3120:1.0.1
 ```
-and then visit `localhost:4200` to confirm it’s working properly.
+and then I visited `localhost:4200` to confirm it’s working properly.  The app loaded, confirming the image built from the GH tag was properly pushed to DH, versioned, and still runs as expected.
+
 
 #### Resources:
 
