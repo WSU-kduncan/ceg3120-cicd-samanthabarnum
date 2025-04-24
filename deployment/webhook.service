@@ -1,9 +1,11 @@
 [Unit]
 Description=Webhook Listener Service
 After=network.target
+Requires=docker.service
 
 [Service]
 ExecStart=/usr/local/bin/webhook -hooks /home/ec2-user/deployment/hook.json -verbose
+WorkingDirectory=/home/ec2-user/deployment
 Restart=always
 User=ec2-user
 

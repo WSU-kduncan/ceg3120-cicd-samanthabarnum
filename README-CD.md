@@ -192,7 +192,7 @@ chmod 400 project5.pem
 This allows AWS to not get mad at me for having too loose of permissions for the `.pem` file, and all new SSH accesses use the command:
 
 ```
-ssh -i "project5.pem" ec2-user@18.234.172.213
+ssh -i "project5.pem" ec2-user@34.194.10.16
 ```
 
 This allowed me to gain SSH access for Docker installation and other deployment tasks for the project.
@@ -437,7 +437,7 @@ The project asks for a shared secret to make sure the webhook only runs when it'
 
 Example curl command to trigger:
 ```
-curl -X POST http://18.234.172.213:9000/hooks/refresh-container -H 'X-Webhook-Token: secret'
+curl -X POST http://34.194.10.16:9000/hooks/refresh-container -H 'X-Webhook-Token: secret'
 ```
 
 - The The `curl -X POST` part is saying:
@@ -532,3 +532,10 @@ https://github.com/adnanh/webhook
 https://ec.haxx.se/usingcurl/downloads/
 https://linuxize.com/post/how-to-extract-unzip-tar-gz-file/
 https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
+https://docs.github.com/en/webhooks/webhook-events-and-payloads
+https://docs.github.com/en/webhooks
+https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks
+https://api.github.com/meta
+https://github.com/docker/for-linux/issues/652
+https://github.com/adnanh/webhook/blob/master/docs/Webhook-Parameters.md
+https://github.com/adnanh/webhook/blob/master/docs/Hook-Examples.md
