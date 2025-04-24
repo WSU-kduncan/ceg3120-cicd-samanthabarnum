@@ -1,0 +1,11 @@
+[Unit]
+Description=Webhook Listener Service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/webhook -hooks /home/ec2-user/deployment/hook.json -verbose
+Restart=always
+User=ec2-user
+
+[Install]
+WantedBy=multi-user.target

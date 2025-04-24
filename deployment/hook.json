@@ -1,0 +1,18 @@
+[
+    {
+      "id": "refresh-container",
+      "execute-command": "/home/ec2-user/deployment/update.sh",
+      "command-working-directory": "/home/ec2-user/deployment",
+      "trigger-rule": {
+        "match": {
+          "type": "value",
+          "value": "secret",
+          "parameter": {
+            "source": "header",
+            "name": "X-Webhook-Token"
+          }
+        }
+      }
+    }
+  ]
+  
