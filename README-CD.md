@@ -105,11 +105,14 @@ jobs:
 - `on: push:` the workflow listens for pushes to the repo
 - `tags:` but not just any push, only when the thing being pushed is a tag that matches this pattern
 - `- 'v*.*.*'` a glob pattern such as `v0.0` or `v4.2.0`
+- `- 'v*.*.*'` a glob pattern such as `v0.0` or `v4.2.0`
 - `runs-on: ubuntu-latest` make me a brand new ubuntu VM for this job to run in
 - `id: meta` just lets future steps reference the output of this step
 - `uses: docker/metadata-action@v5` use version 5 of the official `docker/metadata-action` from GH marketplace, which automatically breaks down tags with glob patterns
 - `with:` lets me introduce parameters given to the `docker/metadata-action`
 - `images: barnum9/barnum-ceg3120` This is my DH image name.  Every generated tag will be applied to this image.
+- `type=semver,pattern={{version}}` Take the full semantic version number and use it as a tag, ie `barnum9/barnum-ceg3120:2.3`
+- `type=semver,pattern={{major}}.{{minor}}` This creates a minor version tag ie `barnum9/barnum-ceg3120:2`
 - `type=semver,pattern={{version}}` Take the full semantic version number and use it as a tag, ie `barnum9/barnum-ceg3120:2.3`
 - `type=semver,pattern={{major}}.{{minor}}` This creates a minor version tag ie `barnum9/barnum-ceg3120:2`
 - `type=semver,pattern={{major}}` This creates a major version tag ie `barnum9/barnum-ceg3120:1`
@@ -140,6 +143,10 @@ git push origin v1.0.1
 
 4. After it completed, I checked DH to confirm that 4 tags were pushed:
 
+  - `latest`
+  - `1`
+  - `1.0`
+  - `1.0.1`
   - `latest`
   - `1`
   - `1.0`
@@ -407,7 +414,17 @@ docker run -d --restart unless-stopped --name $CONTAINER_NAME -p 80:4200 $IMAGE_
        - `-a`: includes both running and stopped containers.
       - `-q`: this makes the output not be a giant mess.
       - `-f name=$CONTAINER_NAME`: lets you narrow down the list to just the containers with the name `angular-app`.
+    - Uses `CONTAINER_ID=$(docker ps -aq -f name=$CONTAINER_NAME)` to get *all* container IDs that match that name, running or stopped.
+      - `docker ps` lists containers.
+       - `-a`: includes both running and stopped containers.
+      - `-q`: this makes the output not be a giant mess.
+      - `-f name=$CONTAINER_NAME`: lets you narrow down the list to just the containers with the name `angular-app`.
 2. If a container exists:
+    - It prints out the matching containers with `docker ps -a -f name=$CONTAINER_NAME`.
+    - Then forcefully removes the container(s) with `docker rm -f $CONTAINER_ID`.
+      - Removes the container named `angular-app`, whether running or not.
+      - Forces it to stop if it's still running, so I don't have to stop it manually first.
+      - Clears the way so the script can pull the new image and create a fresh container without naming drama.
     - It prints out the matching containers with `docker ps -a -f name=$CONTAINER_NAME`.
     - Then forcefully removes the container(s) with `docker rm -f $CONTAINER_ID`.
       - Removes the container named `angular-app`, whether running or not.
@@ -415,9 +432,15 @@ docker run -d --restart unless-stopped --name $CONTAINER_NAME -p 80:4200 $IMAGE_
       - Clears the way so the script can pull the new image and create a fresh container without naming drama.
 3. If no container exists:
     - It just prints `none here` and continues on, I had that for debugging purposes.
+    - It just prints `none here` and continues on, I had that for debugging purposes.
 4. Pulls the latest image from DH:
     - Grabs the newest copy of `barnum9/barnum-ceg3120:latest` to make sure the freshest version is used.
+    - Grabs the newest copy of `barnum9/barnum-ceg3120:latest` to make sure the freshest version is used.
 5. Runs a new container:
+    - Names the container `angular-app`.
+    - Runs it detached with `-d`, so it stays alive in the background.
+    - Uses `--restart unless-stopped` so the container automatically restarts if the instance reboots, unless I manually stop it.  This was super annoying to figure out.
+    - Maps port 4200 inside the container, to port 80 on the EC2 instance, so I can access the app at the EIP without needing to specify a port.
     - Names the container `angular-app`.
     - Runs it detached with `-d`, so it stays alive in the background.
     - Uses `--restart unless-stopped` so the container automatically restarts if the instance reboots, unless I manually stop it.  This was super annoying to figure out.
@@ -612,7 +635,9 @@ I manually tested that the service would still work after a reboot by:
 sudo reboot
 ```
 
+
 2. SSHing back in after the instance came back up.
+
 
 3. Checking:
 ```
@@ -631,11 +656,16 @@ To fully confirm the CI/CD pipeline and webhook integration were working correct
 1. Verified that the webhook listener service was running:
     - Used `sudo systemctl status webhook.service` to confirm the listener was active after reboot.
   
+    - Used `sudo systemctl status webhook.service` to confirm the listener was active after reboot.
+  
 2. Made a small change to my Angular App locally:
+    - I added a comment at the bottom of my `index.html` file like this:
     - I added a comment at the bottom of my `index.html` file like this:
   ```
   <!-- v1.1.1 -->
   ```
+   - This gave me a visual indicator to confirm that the new deployment was using the latest pushed image.
+
    - This gave me a visual indicator to confirm that the new deployment was using the latest pushed image.
 
 3. Committed the change and pushed it to GH:
@@ -646,6 +676,7 @@ git push
 ```
 > Note: I am not sure what the actual commit message waas, I was frustrated, but you get the gist.
 
+
 4. Tagged the commit and pushed the tag:
 ```
 git tag -a v1.1.1 -m "I am losing my mind"
@@ -653,17 +684,28 @@ git push origin v1.1.1
 ```
 > Note: this probably also wasn't the commit message, but might have been to be honest.
 
+
 5. Watched the GH Action run:
+    - Confirmed through the Actions tab that the workflow triggered on the tag push.
+    - Saw in the workflow logs that it successfully build the docker image and pushed all the correct tags (`latest`, `1`, `1.1`, `1.1.1`) to DH.
+    
     - Confirmed through the Actions tab that the workflow triggered on the tag push.
     - Saw in the workflow logs that it successfully build the docker image and pushed all the correct tags (`latest`, `1`, `1.1`, `1.1.1`) to DH.
     
 6. Checked DH to confirm the newest images appeared with the correct tags.
   
+  
 7. Confirmed payload delivery to the EC2 webhook listener:
     - Used the Webhook delivery logs on GH to verify the payload was sent.
     - Also confirmed the webhook logs on the EC2 that the payload was recieved, matched the hook ID, and triggered [update.sh](deployment/update.sh).
     
+    - Used the Webhook delivery logs on GH to verify the payload was sent.
+    - Also confirmed the webhook logs on the EC2 that the payload was recieved, matched the hook ID, and triggered [update.sh](deployment/update.sh).
+    
 8. Verified container restart and redeployment:
+    - Ran `docker ps` on the EC2 to confirm the container had restarted.
+    - Confirmed that it was using the latest image.
+    
     - Ran `docker ps` on the EC2 to confirm the container had restarted.
     - Confirmed that it was using the latest image.
     
