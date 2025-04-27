@@ -6,6 +6,12 @@ This project implements a CD workflow using GitHub webhooks and an AWS EC2 insta
 
 This project builds on the containerization work from Project 4 and adds CD on top of it.  The goal was to automatically redeploy my Angular app running on an EC2 instance whenever I push a new version tag to GH.
 
+### CD Overview Diagram
+
+The following diagram shows the CD workflow for this project.  It shows how code changes, tagging, GH Actions, DH, and the EC2 instance interact to automate deployment.
+
+![Diagram](/images/diagram.png)
+
 ## Part 1
 
 ### View Existing Git Tags
@@ -98,14 +104,14 @@ jobs:
 
 - `on: push:` the workflow listens for pushes to the repo
 - `tags:` but not just any push, only when the thing being pushed is a tag that matches this pattern
-- `- 'v*.*.*'` a glob pattern such as `v1.0.0` or `v4.2.0`
+- `- 'v*.*.*'` a glob pattern such as `v0.0` or `v4.2.0`
 - `runs-on: ubuntu-latest` make me a brand new ubuntu VM for this job to run in
 - `id: meta` just lets future steps reference the output of this step
 - `uses: docker/metadata-action@v5` use version 5 of the official `docker/metadata-action` from GH marketplace, which automatically breaks down tags with glob patterns
 - `with:` lets me introduce parameters given to the `docker/metadata-action`
 - `images: barnum9/barnum-ceg3120` This is my DH image name.  Every generated tag will be applied to this image.
-- `type=semver,pattern={{version}}` Take the full semantic version number and use it as a tag, ie `barnum9/barnum-ceg3120:1.2.3`
-- `type=semver,pattern={{major}}.{{minor}}` This creates a minor version tag ie `barnum9/barnum-ceg3120:1.2`
+- `type=semver,pattern={{version}}` Take the full semantic version number and use it as a tag, ie `barnum9/barnum-ceg3120:2.3`
+- `type=semver,pattern={{major}}.{{minor}}` This creates a minor version tag ie `barnum9/barnum-ceg3120:2`
 - `type=semver,pattern={{major}}` This creates a major version tag ie `barnum9/barnum-ceg3120:1`
 - `type=raw,value=latest` Also tag the image as `latest` every time ie `barnum9/barnum-ceg3120:latest`
 - `tags: ${{ steps.meta.outputs.tags }}` Grabs the generated tags from the earlier metadata step and uses them here for the docker build and push.
@@ -134,10 +140,10 @@ git push origin v1.0.1
 
 4. After it completed, I checked DH to confirm that 4 tags were pushed:
 
-- `latest`
-- `1`
-- `1.0`
-- `1.0.1`
+  - `latest`
+  - `1`
+  - `1.0`
+  - `1.0.1`
 
 To confirm that everything worked correctly, I ran the following commands to pull the versioned image from DH and run it locally (once Docker Desktop was actually running, I was too gung ho):
 
@@ -396,26 +402,26 @@ docker run -d --restart unless-stopped --name $CONTAINER_NAME -p 80:4200 $IMAGE_
 #### How the Script Works
 
 1. Finds containers named `angular-app`:
-  - Uses `CONTAINER_ID=$(docker ps -aq -f name=$CONTAINER_NAME)` to get *all* container IDs that match that name, running or stopped.
-    - `docker ps` lists containers.
-    - `-a`: includes both running and stopped containers.
-    - `-q`: this makes the output not be a giant mess.
-    - `-f name=$CONTAINER_NAME`: lets you narrow down the list to just the containers with the name `angular-app`.
+    - Uses `CONTAINER_ID=$(docker ps -aq -f name=$CONTAINER_NAME)` to get *all* container IDs that match that name, running or stopped.
+      - `docker ps` lists containers.
+       - `-a`: includes both running and stopped containers.
+      - `-q`: this makes the output not be a giant mess.
+      - `-f name=$CONTAINER_NAME`: lets you narrow down the list to just the containers with the name `angular-app`.
 2. If a container exists:
-  - It prints out the matching containers with `docker ps -a -f name=$CONTAINER_NAME`.
-  - Then forcefully removes the container(s) with `docker rm -f $CONTAINER_ID`.
-    - Removes the container named `angular-app`, whether running or not.
-    - Forces it to stop if it's still running, so I don't have to stop it manually first.
-    - Clears the way so the script can pull the new image and create a fresh container without naming drama.
+    - It prints out the matching containers with `docker ps -a -f name=$CONTAINER_NAME`.
+    - Then forcefully removes the container(s) with `docker rm -f $CONTAINER_ID`.
+      - Removes the container named `angular-app`, whether running or not.
+      - Forces it to stop if it's still running, so I don't have to stop it manually first.
+      - Clears the way so the script can pull the new image and create a fresh container without naming drama.
 3. If no container exists:
-  - It just prints `none here` and continues on, I had that for debugging purposes.
+    - It just prints `none here` and continues on, I had that for debugging purposes.
 4. Pulls the latest image from DH:
-  - Grabs the newest copy of `barnum9/barnum-ceg3120:latest` to make sure the freshest version is used.
+    - Grabs the newest copy of `barnum9/barnum-ceg3120:latest` to make sure the freshest version is used.
 5. Runs a new container:
-  - Names the container `angular-app`.
-  - Runs it detached with `-d`, so it stays alive in the background.
-  - Uses `--restart unless-stopped` so the container automatically restarts if the instance reboots, unless I manually stop it.  This was super annoying to figure out.
-  - Maps port 4200 inside the container, to port 80 on the EC2 instance, so I can access the app at the EIP without needing to specify a port.
+    - Names the container `angular-app`.
+    - Runs it detached with `-d`, so it stays alive in the background.
+    - Uses `--restart unless-stopped` so the container automatically restarts if the instance reboots, unless I manually stop it.  This was super annoying to figure out.
+    - Maps port 4200 inside the container, to port 80 on the EC2 instance, so I can access the app at the EIP without needing to specify a port.
 
 ---
 
@@ -605,7 +611,9 @@ I manually tested that the service would still work after a reboot by:
 ```
 sudo reboot
 ```
+
 2. SSHing back in after the instance came back up.
+
 3. Checking:
 ```
 sudo systemctl status webhook.service
@@ -621,13 +629,15 @@ The service was running!
 To fully confirm the CI/CD pipeline and webhook integration were working correctly, I did an end-to-end deployment test:
 
 1. Verified that the webhook listener service was running:
-  - Used `sudo systemctl status webhook.service` to confirm the listener was active after reboot.
+    - Used `sudo systemctl status webhook.service` to confirm the listener was active after reboot.
+  
 2. Made a small change to my Angular App locally:
-  - I added a comment at the bottom of my `index.html` file like this:
+    - I added a comment at the bottom of my `index.html` file like this:
   ```
   <!-- v1.1.1 -->
   ```
- - This gave me a visual indicator to confirm that the new deployment was using the latest pushed image.
+   - This gave me a visual indicator to confirm that the new deployment was using the latest pushed image.
+
 3. Committed the change and pushed it to GH:
 ```
 git add .
@@ -635,55 +645,89 @@ git commit -m "added version comment to index.html"
 git push
 ```
 > Note: I am not sure what the actual commit message waas, I was frustrated, but you get the gist.
+
 4. Tagged the commit and pushed the tag:
 ```
 git tag -a v1.1.1 -m "I am losing my mind"
 git push origin v1.1.1
 ```
 > Note: this probably also wasn't the commit message, but might have been to be honest.
+
 5. Watched the GH Action run:
-  - Confirmed through the Actions tab that the workflow triggered on the tag push.
-  - Saw in the workflow logs that it successfully build the docker image and pushed all the correct tags (`latest`, `1`, `1.1`, `1.1.1`) to DH.
+    - Confirmed through the Actions tab that the workflow triggered on the tag push.
+    - Saw in the workflow logs that it successfully build the docker image and pushed all the correct tags (`latest`, `1`, `1.1`, `1.1.1`) to DH.
+    
 6. Checked DH to confirm the newest images appeared with the correct tags.
+  
 7. Confirmed payload delivery to the EC2 webhook listener:
-  - Used the Webhook delivery logs on GH to verify the payload was sent.
-  - Also confirmed the webhook logs on the EC2 that the payload was recieved, matched the hook ID, and triggered [update.sh](deployment/update.sh).
+    - Used the Webhook delivery logs on GH to verify the payload was sent.
+    - Also confirmed the webhook logs on the EC2 that the payload was recieved, matched the hook ID, and triggered [update.sh](deployment/update.sh).
+    
 8. Verified container restart and redeployment:
-  - Ran `docker ps` on the EC2 to confirm the container had restarted.
-  - Confirmed that it was using the latest image.
+    - Ran `docker ps` on the EC2 to confirm the container had restarted.
+    - Confirmed that it was using the latest image.
+    
 9. Reloaded the app in the browser to verify the change went live:
-  - Opened the EIP (`http://34.194.10.16`) in Firefox.
-  - Used "View Page Source" to confirm that the version comment (`<!-- v1.1.1 -->`) was present at the bottom of the source code.
+    - Opened the EIP (`http://34.194.10.16`) in Firefox.
+    - Used "View Page Source" to confirm that the version comment (`<!-- v1.1.1 -->`) was present at the bottom of the source code.
+
+---   
 
 #### Resources:
 
-https://www.malikbrowne.com/blog/a-beginners-guide-glob-patterns/
-https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile
-https://docs.docker.com/reference/dockerfile/
-https://docs.docker.com/reference/cli/docker/image/
-https://docs.docker.com/build/ci/github-actions
-https://github.com/marketplace/actions/build-and-push-docker-images
-https://aws.amazon.com/ebs/general-purpose/
-https://docs.aws.amazon.com/linux/al2023/ug/managing-repos-os-updates.html
-https://docs.aws.amazon.com/AmazonECS/latest/developerguide/create-container-image.html
-https://medium.com/@manojkumar_41904/step-by-step-guide-pushing-and-pulling-docker-images-to-aws-elastic-container-registry-ecr-8c02584a76bf
-https://cyberpanel.net/blog/dnf-vs-yum
-https://askubuntu.com/questions/477551/how-can-i-use-docker-without-sudo
-https://docs.docker.com/engine/network/#published-ports
-https://askubuntu.com/questions/443789/what-does-chmod-x-filename-do-and-how-do-i-use-it
-https://github.com/adnanh/webhook
-https://ec.haxx.se/usingcurl/downloads/
-https://linuxize.com/post/how-to-extract-unzip-tar-gz-file/
-https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
-https://docs.github.com/en/webhooks/webhook-events-and-payloads
-https://docs.github.com/en/webhooks
-https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks
-https://api.github.com/meta
-https://github.com/docker/for-linux/issues/652
-https://github.com/adnanh/webhook/blob/master/docs/Webhook-Parameters.md
-https://github.com/adnanh/webhook/blob/master/docs/Hook-Examples.md
-https://docs.aws.amazon.com/linux/al2023/ug/what-is-amazon-linux.html
-https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html
-https://docs.docker.com/engine/containers/start-containers-automatically/
-https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html
-https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html
+I also used a lot of the sources cited in my [Project 4 Documentation](README-CI.md) for this project, as they overlap.
+
+##### AWS / EC2 Setup
+
+- [Amazon SSD Info](https://aws.amazon.com/ebs/general-purpose/)
+- [AL 2023 Documentation](https://docs.aws.amazon.com/linux/al2023/ug/what-is-amazon-linux.html)
+- [Managing repos and OS updates on AL2023](https://docs.aws.amazon.com/linux/al2023/ug/managing-repos-os-updates.html)
+- [EIP on AWS](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)
+- [AWS VPC security group rules](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html)
+
+
+##### Docker Setup and Usage
+
+- [Writing a dockerfile](https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile)
+- [Docker CLI reference](https://docs.docker.com/reference/cli/docker/image/)
+- [Published ports](https://docs.docker.com/engine/network/#published-ports)
+- [Start containers automatically](https://docs.docker.com/engine/containers/start-containers-automatically/)
+- [Installing docker on AL](https://docs.aws.amazon.com/linux/al2023/ug/install-docker.html)  
+
+
+##### Webhook Setup
+
+- [`adnanh/webhook` GH repo](https://github.com/adnanh/webhook)
+- [Webhook parameters](https://github.com/adnanh/webhook/blob/master/docs/Webhook-Parameters.md)
+- [Webhook examples](https://github.com/adnanh/webhook/blob/master/docs/Hook-Examples.md)
+- [Systemd service file docs](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html)
+
+
+##### GH Webhooks and CI/CD Integration
+
+- [GH webhooks Events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)
+- [Testing and troubleshooting GH webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks)
+- [GH meta API (for IP ranges)](https://api.github.com/meta)
+- [Building and pushing docker images with GH actions](https://github.com/marketplace/actions/build-and-push-docker-images)
+- [GitHub actions docs](https://docs.github.com/en/actions)
+
+
+##### Command References / Troubleshooting
+
+- [dnf vs yum (Why I used dnf on AL2023)](https://cyberpanel.net/blog/dnf-vs-yum)
+- [Using docker Without sudo](https://askubuntu.com/questions/477551/how-can-i-use-docker-without-sudo)
+- [Understanding `chmod +x` perms](https://askubuntu.com/questions/443789/what-does-chmod-x-filename-do-and-how-do-i-use-it)
+- [How to extract .tar.gz files](https://linuxize.com/post/how-to-extract-unzip-tar-gz-file/)
+- [curl command guide](https://ec.haxx.se/usingcurl/downloads/)
+
+
+##### Documentation and Diagram Tools
+
+- [Lucidchart](https://www.lucidchart.com/pages)
+- [Markdown guide](https://www.markdownguide.org/)
+- [ChatGPT](https://www.chatgpt.com/)
+  - "Can you explain how webhook listeners work with GitHub payloads?"
+  - "How can I make port 9000 open on my EC2 instance to just gihub and not the entire world so my webhook works?"
+  - "how can I make Docker automatically restart containers after a system reboot?"
+  - "What is the easiest way to configure systemd services to autostart at boot on Amazon Linux?"
+  - "how do I troubleshoot a webhook not triggering my script correctly I am losing my mind"
