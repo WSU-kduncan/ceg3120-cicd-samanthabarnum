@@ -14,6 +14,7 @@ else
     echo "none here"
 fi
 
+docker rmi -f $IMAGE_NAME
 docker pull $IMAGE_NAME
 
 docker run -d --restart unless-stopped --name $CONTAINER_NAME -p 80:4200 $IMAGE_NAME
